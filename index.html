@@ -4,75 +4,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KrodAI</title>
 
-<style>
-body{margin:0;font-family:sans-serif;background:#F5E6D3;}
-.container{padding:16px;padding-bottom:100px;}
-.card{background:white;border-radius:18px;padding:16px;margin-bottom:14px;}
-.hero{background:linear-gradient(135deg,#FF4D00,#FF7A00);color:white;text-align:center;border-radius:20px;padding:20px;}
-.btn{background:#FF4D00;color:white;border:none;padding:12px;border-radius:12px;margin:6px;width:45%;}
-.grid{display:flex;flex-wrap:wrap;justify-content:space-between;}
-.voice{position:fixed;bottom:80px;right:20px;width:70px;height:70px;border-radius:50%;background:#FF4D00;color:white;font-size:22px;box-shadow:0 10px 25px rgba(0,0,0,0.2);}
-#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:black;color:white;padding:10px;border-radius:20px;display:none;}
-.progress{height:10px;background:#eee;border-radius:10px;}
-.progress-bar{height:10px;background:#FF4D00;border-radius:10px;width:0%;}
-</style>
-
-<!-- ✅ FIREBASE COMPAT -->
+<!-- FIREBASE (COMPAT - SAFE) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+<style>
+body{margin:0;font-family:sans-serif;background:#EADBC8;}
+.container{padding:16px;padding-bottom:100px;}
+.card{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;}
+.hero{background:linear-gradient(135deg,#FF4D00,#FF7A00);color:white;text-align:center;}
+.btn{background:#FF4D00;color:white;border:none;padding:14px;border-radius:12px;margin:6px;font-size:16px;}
+.voice{position:fixed;bottom:80px;right:20px;width:70px;height:70px;border-radius:50%;background:#FF4D00;color:white;font-size:24px;box-shadow:0 10px 25px rgba(0,0,0,0.2);}
+</style>
 </head>
 
 <body>
 
-<div id="toast"></div>
-
 <div class="container">
 
-<!-- HERO -->
-<div class="hero">
-<div style="font-size:38px;font-weight:800;" id="profit">₹0</div>
+<div class="card hero">
+<h1 id="profit">₹0</h1>
 <div>Aaj ka Profit 🔥</div>
 <div id="meta">Sales ₹0 | Kharcha ₹0</div>
 </div>
 
-<!-- ACTION BUTTONS -->
-<div class="card grid">
-<button class="btn" onclick="manualSale()">🛒 + Sale</button>
-<button class="btn" onclick="manualUdhar()">💼 + Udhar</button>
-<button class="btn" onclick="manualExpense()">💸 + Kharcha</button>
+<div class="card">
+<button class="btn" onclick="addSale()">+ Sale</button>
+<button class="btn" onclick="addUdhar()">+ Udhar</button>
+<button class="btn" onclick="addExpense()">+ Kharcha</button>
 <button class="btn" onclick="startVoice()">🎤 Bolke Likho</button>
 </div>
 
-<!-- GOAL -->
 <div class="card">
-🎯 <span id="goalText"></span>
-<div class="progress"><div id="goalBar" class="progress-bar"></div></div>
+<h3>📦 Stock Alerts</h3>
+<div id="inventory"></div>
 </div>
 
-<!-- AI -->
 <div class="card">
-🧠 <div id="insights"></div>
-<div id="actions"></div>
+<h3>💰 Udhar</h3>
+<div id="udhar"></div>
 </div>
 
-<!-- LAST -->
 <div class="card">
-🧾 <div id="lastEntry"></div>
-</div>
-
-<!-- INVENTORY -->
-<div class="card">
-📦 <div id="inventory"></div>
-</div>
-
-<!-- UDHAR -->
-<div class="card">
-💰 <div id="udhar"></div>
+<h3>🧠 Smart Salah</h3>
+<div id="insights"></div>
 </div>
 
 <button class="btn" onclick="share()">Share</button>
-<button class="btn" onclick="shareWhatsApp()">WhatsApp</button>
+<button class="btn" onclick="shareWA()">WhatsApp</button>
 
 </div>
 
@@ -80,178 +59,110 @@ body{margin:0;font-family:sans-serif;background:#F5E6D3;}
 
 <script>
 
-// 🔥 FIREBASE CONFIG
+// FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "AIzaSyB8v9gYxCg4qBfLl2J08D9TeUVygKVAqC8",
-  authDomain: "panshopmanager.firebaseapp.com",
-  projectId: "panshopmanager",
-  storageBucket: "panshopmanager.firebasestorage.app",
-  messagingSenderId: "448042777087",
-  appId: "1:448042777087:web:9b4c4a0bd4dbc425bccfca",
-  measurementId: "G-YVLCREDL6Q"
+  apiKey: "PASTE",
+  authDomain: "PASTE",
+  projectId: "PASTE"
 };
 
+firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let entries=[],inventory={},customers={};
+let entries=[];
+let inventory={chai:10};
+let customers={};
 
-// TOAST
-function toast(t){
-const el=document.getElementById("toast");
-el.innerText=t;el.style.display="block";
-setTimeout(()=>el.style.display="none",2000);
-}
-
-// SAVE
-function saveEntry(e){
-
-db.collection("entries_v2").add({
-...e,
-createdAt:new Date()
-});
-
-if(e.productName){
-inventory[e.productName]=(inventory[e.productName]||10)-1;
-db.collection("inventory").doc("main").set(inventory);
-}
-
-if(e.type==="udhar"){
-customers[e.customerName]=(customers[e.customerName]||0)+e.amount;
-db.collection("customers").doc("main").set(customers);
-}
-
-toast("Saved ₹"+(e.amount||0));
-load();
-}
-
-// LOAD
+// LOAD DATA
 async function load(){
 
-const snap=await db.collection("entries_v2").get();
-entries=[];
-snap.forEach(d=>entries.push(d.data()));
+  const snap = await db.collection("entries_v2").get();
+  entries=[];
+  snap.forEach(d=>entries.push(d.data()));
 
-const inv=await db.collection("inventory").doc("main").get();
-if(inv.exists) inventory=inv.data();
-
-const cust=await db.collection("customers").doc("main").get();
-if(cust.exists) customers=cust.data();
-
-updateUI();
-loadAI();
+  updateUI();
 }
 
 // UI
 function updateUI(){
 
-let sales=0,expense=0;
+  let sales=0,expense=0;
 
-entries.forEach(e=>{
-if(e.type==="sale") sales+=e.amount;
-if(e.type==="expense") expense+=e.amount;
-});
+  entries.forEach(e=>{
+    if(e.type==="sale") sales+=e.amount;
+    if(e.type==="expense") expense+=e.amount;
+  });
 
-const profit=sales-expense;
+  document.getElementById("profit").innerText="₹"+(sales-expense);
+  document.getElementById("meta").innerText=`Sales ₹${sales} | Kharcha ₹${expense}`;
 
-document.getElementById("profit").innerText="₹"+profit;
-document.getElementById("meta").innerText=`Sales ₹${sales} | Kharcha ₹${expense}`;
+  document.getElementById("inventory").innerHTML = inventory.chai<5 ? "⚠️ chai low" : "OK";
 
-// GOAL
-const g=500;
-const p=Math.min((profit/g)*100,100);
-document.getElementById("goalText").innerText=`₹${profit}/₹${g}`;
-document.getElementById("goalBar").style.width=p+"%";
+  document.getElementById("udhar").innerHTML =
+    Object.keys(customers).map(c=>`${c}: ₹${customers[c]}`).join("<br>");
 
-// LAST
-const last=entries[entries.length-1];
-if(last){
-document.getElementById("lastEntry").innerText=
-`${last.type} ₹${last.amount} • ${new Date().toLocaleTimeString()}`;
+  document.getElementById("insights").innerHTML =
+    sales<200 ? "💡 Push sales" : "🔥 Good going";
 }
 
-// INVENTORY
-let iHTML="";
-Object.keys(inventory).forEach(k=>{
-iHTML+=`${k}: ${inventory[k]}<br>`;
-});
-document.getElementById("inventory").innerHTML=iHTML;
-
-// UDHAR
-let uHTML="";
-Object.keys(customers).forEach(c=>{
-uHTML+=`${c}: ₹${customers[c]}<br>`;
-});
-document.getElementById("udhar").innerHTML=uHTML;
-
+// ACTIONS
+async function addSale(){
+  await db.collection("entries_v2").add({type:"sale",amount:50,createdAt:new Date()});
+  inventory.chai--;
+  load();
 }
 
-// AI
-async function loadAI(){
-
-try{
-const res=await fetch("https://getaiinsight-wzwuduebea-uc.a.run.app",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({totalSales:100})
-});
-
-const j=await res.json();
-document.getElementById("insights").innerText=j.insight||"";
-
-}catch{
-document.getElementById("insights").innerText="AI unavailable";
+async function addExpense(){
+  await db.collection("entries_v2").add({type:"expense",amount:20,createdAt:new Date()});
+  load();
 }
+
+async function addUdhar(){
+  customers["Ramesh"]=(customers["Ramesh"]||0)+50;
+  alert("Udhar added ₹50");
+  updateUI();
+}
+
+// SHARE
+function share(){
+  const text="🔥 Aaj profit dekh lo!";
+  if(navigator.share) navigator.share({text});
+  else alert(text);
+}
+
+function shareWA(){
+  window.open("https://wa.me/?text=Aaj profit check karo");
 }
 
 // VOICE
 function startVoice(){
 
-if(!('webkitSpeechRecognition' in window)){
-toast("Voice not supported");
-return;
-}
+  if(!('webkitSpeechRecognition' in window)){
+    alert("Voice not supported");
+    return;
+  }
 
-const r=new webkitSpeechRecognition();
-r.lang="hi-IN";
-r.start();
+  const r=new webkitSpeechRecognition();
+  r.lang="hi-IN";
+  r.start();
 
-r.onresult=async(e)=>{
-const text=e.results[0][0].transcript;
+  r.onresult=async(e)=>{
+    const text=e.results[0][0].transcript;
 
-const res=await fetch("https://getaiinsight-wzwuduebea-uc.a.run.app",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({prompt:text})
-});
+    await db.collection("entries_v2").add({
+      type:"sale",
+      amount:50,
+      createdAt:new Date()
+    });
 
-const j=await res.json();
-let data;
-
-try{data=JSON.parse(j.response);}
-catch{data={type:"sale",amount:50};}
-
-saveEntry(data);
-};
-}
-
-// MANUAL
-function manualSale(){saveEntry({type:"sale",amount:50});}
-function manualExpense(){saveEntry({type:"expense",amount:20});}
-function manualUdhar(){saveEntry({type:"udhar",amount:100,customerName:"Ram"});}
-
-// SHARE
-function share(){
-navigator.clipboard.writeText("Aaj kamaaya!");
-toast("Copied 🔥");
-}
-
-function shareWhatsApp(){
-window.open("https://wa.me/?text=Aaj kamaaya");
+    load();
+  };
 }
 
 // INIT
-load();
+window.onload = load;
 
 </script>
+
 </body>
 </html>

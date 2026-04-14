@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KrodAI</title>
+
+<style>
+body{margin:0;font-family:sans-serif;background:#F7F7F7;}
+.container{padding:16px;padding-bottom:100px;}
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:14px;}
+.hero{background:linear-gradient(135deg,#FF4D00,#FF7A00);color:white;text-align:center;}
+.hero .profit{font-size:34px;font-weight:700;}
+.btn{background:#FF4D00;color:white;border:none;padding:10px;border-radius:10px;margin-top:10px;}
+.voice{position:fixed;bottom:80px;right:20px;width:60px;height:60px;border-radius:50%;background:#FF4D00;color:white;}
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+background:black;color:white;padding:10px;border-radius:20px;display:none;}
+#onboarding{position:fixed;top:0;left:0;width:100%;height:100%;background:white;display:flex;flex-direction:column;justify-content:center;align-items:center;}
+</style>
+</head>
+
+<body>
+
+<div id="toast"></div>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+<h2>Select your shop</h2>
+<button class="btn" onclick="selectCategory('tea')">Tea</button>
+<button class="btn" onclick="selectCategory('pan')">Pan</button>
+<button class="btn" onclick="selectCategory('juice')">Juice</button>
+</div>
+
+<div class="container" id="app" style="display:none;">
+
+<div class="card hero">
+<div>Profit</div>
+<div id="profit">₹0</div>
+</div>
+
+<div class="card">
+🎯 <div id="goal">₹0 / ₹500</div>
+</div>
+
+<div class="card">
+🧠 <div id="insights"></div>
+<div id="actions"></div>
+</div>
+
+<div class="card">
+🧾 <div id="lastEntry"></div>
+</div>
+
+<div class="card">
+📦 <div id="inventory"></div>
+</div>
+
+<button class="btn" onclick="share()">Share</button>
+<button class="btn" onclick="sendWhatsApp()">WhatsApp</button>
+
+</div>
+
+<button class="voice" onclick="startVoice()">🎤</button>
+
+<script>
+
+let entries=[];
+let inventory={};
+let customers={};
+let products=[];
+let lastProduct=null;
+
+const packs={
+tea:[{n:"chai",p:10,s:50}],
+pan:[{n:"gold flake",p:20,s:30}],
+juice:[{n:"orange",p:30,s:20}]
+};
+
+function showToast(t){
+const el=document.getElementById("toast");
+el.innerText=t;el.style.display="block";
+setTimeout(()=>el.style.display="none",2000);
+}
+
+function selectCategory(c){
+products=packs[c];
+products.forEach(p=>inventory[p.n]=p.s);
+document.getElementById("onboarding").style.display="none";
+document.getElementById("app").style.display="block";
+}
+
+function saveEntry(e){
+e.time=new Date();
+entries.push(e);
+
+if(e.productName){
+inventory[e.productName]-=e.quantity||1;
+}
+
+if(e.type==="udhar"){
+customers[e.customerName]=(customers[e.customerName]||0)+e.amount;
+}
+
+showToast(`Saved ₹${e.amount} at ${e.time.toLocaleTimeString()}`);
+updateUI();
+}
+
+function updateUI(){
+
+let total=0;
+entries.forEach(e=>{
+if(e.type==="sale") total+=e.amount;
+if(e.type==="expense") total-=e.amount;
+});
+
+document.getElementById("profit").innerText="₹"+total;
+document.getElementById("goal").innerText=`₹${total} / 500`;
+
+const last=entries[entries.length-1];
+if(last){
+document.getElementById("lastEntry").innerText=
+`${last.type} ₹${last.amount} • ${last.time.toLocaleTimeString()}`;
+}
+
+let inv="";
+Object.keys(inventory).forEach(k=>{
+if(inventory[k]<5) inv+=`⚠️ ${k} low<br>`;
+});
+document.getElementById("inventory").innerHTML=inv;
+
+generateInsights(total);
+}
+
+function generateInsights(total){
+
+let text="";
+
+if(total<200){
+text="Push sales 💪";
+document.getElementById("actions").innerHTML=
+`<button onclick="quickSale(10)">Sell chai</button>`;
+}else{
+text="Good day 🔥";
+}
+
+for(let c in customers){
+if(customers[c]>200){
+text+=`<br>⚠️ ${c} udhar high`;
+}
+}
+
+document.getElementById("insights").innerHTML=text;
+}
+
+function quickSale(p){
+saveEntry({type:"sale",amount:p,productName:"chai",quantity:1});
+}
+
+function share(){
+let total=0;
+entries.forEach(e=>{if(e.type==="sale") total+=e.amount;});
+const text=`Aaj ₹${total} kamaya 🔥`;
+
+navigator.share?navigator.share({text}):alert(text);
+}
+
+function sendWhatsApp(){
+let total=0;
+entries.forEach(e=>{if(e.type==="sale") total+=e.amount;});
+window.open(`https://wa.me/?text=Aaj ₹${total} kamaya`);
+}
+
+function startVoice(){
+const r=new webkitSpeechRecognition();
+r.lang="hi-IN";
+r.start();
+
+r.onresult=(e)=>{
+const t=e.results[0][0].transcript.toLowerCase();
+
+let amt=50;
+
+if(t.includes("chai")) amt=10;
+if(t.includes("udhar")){
+saveEntry({type:"udhar",amount:50,customerName:"Ramesh"});
+return;
+}
+
+saveEntry({type:"sale",amount:amt,productName:"chai",quantity:1});
+};
+}
+
+</script>
+
+</body>
+</html>

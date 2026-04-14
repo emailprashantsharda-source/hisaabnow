@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KrodAI</title>
 
-<!-- FIREBASE (COMPAT - SAFE) -->
+<!-- FIREBASE SAFE -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
@@ -37,17 +37,17 @@ body{margin:0;font-family:sans-serif;background:#EADBC8;}
 
 <div class="card">
 <h3>📦 Stock Alerts</h3>
-<div id="inventory"></div>
+<div id="inventory">Loading...</div>
 </div>
 
 <div class="card">
 <h3>💰 Udhar</h3>
-<div id="udhar"></div>
+<div id="udhar">Loading...</div>
 </div>
 
 <div class="card">
 <h3>🧠 Smart Salah</h3>
-<div id="insights"></div>
+<div id="insights">Loading...</div>
 </div>
 
 <button class="btn" onclick="share()">Share</button>
@@ -69,7 +69,6 @@ const firebaseConfig = {
   appId: "1:448042777087:web:9b4c4a0bd4dbc425bccfca",
   measurementId: "G-YVLCREDL6Q"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -80,14 +79,24 @@ let customers={};
 // LOAD DATA
 async function load(){
 
-  const snap = await db.collection("entries_v2").get();
-  entries=[];
-  snap.forEach(d=>entries.push(d.data()));
+  try{
+    const snap = await db.collection("entries_v2").get();
 
-  updateUI();
+    entries = [];
+
+    snap.forEach(d=>{
+      entries.push(d.data());
+    });
+
+    updateUI();
+
+  }catch(e){
+    console.error(e);
+    alert("Load error: " + e.message);
+  }
 }
 
-// UI
+// UI UPDATE
 function updateUI(){
 
   let sales=0,expense=0;
@@ -100,10 +109,13 @@ function updateUI(){
   document.getElementById("profit").innerText="₹"+(sales-expense);
   document.getElementById("meta").innerText=`Sales ₹${sales} | Kharcha ₹${expense}`;
 
-  document.getElementById("inventory").innerHTML = inventory.chai<5 ? "⚠️ chai low" : "OK";
+  document.getElementById("inventory").innerHTML =
+    inventory.chai<5 ? "⚠️ chai low" : "OK";
 
   document.getElementById("udhar").innerHTML =
-    Object.keys(customers).map(c=>`${c}: ₹${customers[c]}`).join("<br>");
+    Object.keys(customers).length
+    ? Object.keys(customers).map(c=>`${c}: ₹${customers[c]}`).join("<br>")
+    : "No udhar";
 
   document.getElementById("insights").innerHTML =
     sales<200 ? "💡 Push sales" : "🔥 Good going";
@@ -111,17 +123,40 @@ function updateUI(){
 
 // ACTIONS
 async function addSale(){
-  await db.collection("entries_v2").add({type:"sale",amount:50,createdAt:new Date()});
-  inventory.chai--;
-  load();
+
+  try{
+    await db.collection("entries_v2").add({
+      type:"sale",
+      amount:50,
+      createdAt:new Date()
+    });
+
+    inventory.chai--;
+
+    await load();
+
+  }catch(e){
+    alert("Error: "+e.message);
+  }
 }
 
 async function addExpense(){
-  await db.collection("entries_v2").add({type:"expense",amount:20,createdAt:new Date()});
-  load();
+
+  try{
+    await db.collection("entries_v2").add({
+      type:"expense",
+      amount:20,
+      createdAt:new Date()
+    });
+
+    await load();
+
+  }catch(e){
+    alert("Error: "+e.message);
+  }
 }
 
-async function addUdhar(){
+function addUdhar(){
   customers["Ramesh"]=(customers["Ramesh"]||0)+50;
   alert("Udhar added ₹50");
   updateUI();
@@ -129,7 +164,7 @@ async function addUdhar(){
 
 // SHARE
 function share(){
-  const text="🔥 Aaj profit dekh lo!";
+  const text="🔥 Aaj profit check karo!";
   if(navigator.share) navigator.share({text});
   else alert(text);
 }
@@ -151,20 +186,23 @@ function startVoice(){
   r.start();
 
   r.onresult=async(e)=>{
-    const text=e.results[0][0].transcript;
+    try{
+      await db.collection("entries_v2").add({
+        type:"sale",
+        amount:50,
+        createdAt:new Date()
+      });
 
-    await db.collection("entries_v2").add({
-      type:"sale",
-      amount:50,
-      createdAt:new Date()
-    });
+      await load();
 
-    load();
+    }catch(err){
+      alert("Voice error");
+    }
   };
 }
 
-// INIT
-window.onload = load;
+// INIT (IMPORTANT FIX)
+setTimeout(load, 500);
 
 </script>
 

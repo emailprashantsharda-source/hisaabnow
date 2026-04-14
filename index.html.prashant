@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KrodAI</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#F7F7F7;}
+.container{padding:16px;padding-bottom:100px;}
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:14px;}
+.hero{background:linear-gradient(135deg,#FF4D00,#FF7A00);color:white;text-align:center;}
+.hero .profit{font-size:34px;font-weight:700;}
+.btn{background:#FF4D00;color:white;border:none;padding:12px;border-radius:12px;margin:5px;}
+.fast-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.fast-item{background:white;padding:12px;border-radius:12px;text-align:center;}
+.nav{position:fixed;bottom:0;width:100%;background:white;display:flex;justify-content:space-around;padding:10px;}
+.voice{position:fixed;bottom:80px;right:20px;width:60px;height:60px;border-radius:50%;background:#FF4D00;color:white;font-size:22px;border:none;}
+.screen{display:none;}
+</style>
+</head>
+
+<body>
+
+<!-- HOME -->
+<div id="homeScreen" class="screen container">
+
+  <div class="card hero">
+    <div>Aaj ka Profit</div>
+    <div id="profit" class="profit">₹0</div>
+  </div>
+
+  <div>
+    <button class="btn" onclick="addSale()">+ Sale</button>
+    <button class="btn" onclick="addExpense()">+ Expense</button>
+  </div>
+
+  <div class="card">
+    <b>⚡ Fast Sale</b>
+    <div id="fastSell" class="fast-grid"></div>
+  </div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button onclick="showScreen('home')">🏠</button>
+</div>
+
+<!-- VOICE -->
+<button class="voice" onclick="startVoice()">🎤</button>
+
+<script type="module">
+
+// ---------------- FIREBASE ----------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* 🔥 PASTE YOUR FIREBASE CONFIG BELOW */
+const firebaseConfig = {
+  apiKey: "PASTE",
+  authDomain: "PASTE",
+  projectId: "PASTE",
+  storageBucket: "PASTE",
+  messagingSenderId: "PASTE",
+  appId: "PASTE"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ---------------- DATA ----------------
+let entries = [];
+
+let products = [
+  {name:"Chai",price:10},
+  {name:"Gold Flake",price:20},
+  {name:"Maggi",price:15}
+];
+
+// ---------------- NAV ----------------
+window.showScreen = function(name){
+  document.querySelectorAll(".screen").forEach(s=>s.style.display="none");
+  document.getElementById(name+"Screen").style.display="block";
+};
+
+// ---------------- SAVE ----------------
+window.addSale = async function(){
+  try{
+    await addDoc(collection(db,"entries_v2"),{
+      type:"sale",
+      amount:100,
+      createdAt:new Date()
+    });
+    loadEntries();
+  }catch(e){
+    alert("Error saving");
+    console.error(e);
+  }
+};
+
+window.addExpense = async function(){
+  try{
+    await addDoc(collection(db,"entries_v2"),{
+      type:"expense",
+      amount:50,
+      createdAt:new Date()
+    });
+    loadEntries();
+  }catch(e){
+    alert("Error saving");
+  }
+};
+
+// ---------------- LOAD ----------------
+async function loadEntries(){
+  const snap = await getDocs(collection(db,"entries_v2"));
+
+  entries = [];
+  snap.forEach(doc=>entries.push(doc.data()));
+
+  updateProfit();
+}
+
+// ---------------- PROFIT ----------------
+function updateProfit(){
+  let sales=0,expense=0;
+
+  entries.forEach(e=>{
+    if(e.type==="sale") sales+=e.amount;
+    if(e.type==="expense") expense+=e.amount;
+  });
+
+  document.getElementById("profit").innerText="₹"+(sales-expense);
+}
+
+// ---------------- FAST SELL ----------------
+function renderFastSell(){
+  let html="";
+  products.forEach(p=>{
+    html+=`
+    <div class="fast-item" onclick="quickSale(${p.price})">
+      ${p.name}<br>₹${p.price}
+    </div>`;
+  });
+  document.getElementById("fastSell").innerHTML=html;
+}
+
+window.quickSale = async function(price){
+  await addDoc(collection(db,"entries_v2"),{
+    type:"sale",
+    amount:price,
+    createdAt:new Date()
+  });
+  loadEntries();
+};
+
+// ---------------- VOICE ----------------
+window.startVoice = function(){
+
+  if (!('webkitSpeechRecognition' in window)) {
+    alert("Voice not supported in this browser");
+    return;
+  }
+
+  const recognition = new webkitSpeechRecognition();
+
+  recognition.lang = "hi-IN";
+  recognition.start();
+
+  recognition.onresult = async (event)=>{
+    const text = event.results[0][0].transcript;
+    alert("You said: " + text);
+    await processVoice(text);
+  };
+
+  recognition.onerror = ()=>{
+    alert("Voice error ❌");
+  };
+};
+
+// ---------------- OPENAI ----------------
+async function callAI(prompt){
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer YOUR_OPENAI_KEY"
+    },
+    body: JSON.stringify({
+      model:"gpt-4o-mini",
+      messages:[{role:"user",content:prompt}],
+      temperature:0.3
+    })
+  });
+
+  const data = await res.json();
+
+  return data.choices[0].message.content;
+}
+
+// ---------------- PROCESS VOICE ----------------
+async function processVoice(text){
+
+  try{
+
+    const prompt = `
+Convert into JSON:
+
+"${text}"
+
+Examples:
+"2 chai bechi" → {"type":"sale","amount":20}
+"100 kharcha" → {"type":"expense","amount":100}
+
+Return ONLY JSON.
+`;
+
+    const result = await callAI(prompt);
+
+    const data = JSON.parse(result);
+
+    await addDoc(collection(db,"entries_v2"),{
+      ...data,
+      createdAt:new Date()
+    });
+
+    alert("Saved via voice 👍");
+
+    loadEntries();
+
+  }catch(e){
+    console.error(e);
+    alert("Voice samajh nahi aaya ❌");
+  }
+}
+
+// ---------------- INIT ----------------
+renderFastSell();
+showScreen("home");
+loadEntries();
+
+</script>
+
+</body>
+</html>

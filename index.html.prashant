@@ -187,7 +187,7 @@ async function callAI(prompt){
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "Authorization":"Bearer YOUR_OPENAI_KEY"
+      "Authorization":"Bearer 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"
     },
     body: JSON.stringify({
       model:"gpt-4o-mini",

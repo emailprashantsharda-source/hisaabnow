@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KrodAI</title>
+
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(180deg,#FFF4E6,#FDEBD3);
+}
+
+.container{padding:16px;padding-bottom:100px;}
+
+.hero-card{
+  background:linear-gradient(135deg,#FF6A00,#FF8C42);
+  border-radius:22px;
+  color:white;
+  text-align:center;
+  box-shadow:0 15px 35px rgba(0,0,0,0.2);
+}
+.hero-inner{padding:22px;}
+.amount{font-size:42px;font-weight:800;}
+.title{font-size:18px;margin-top:6px;}
+.sub{font-size:13px;margin-top:6px;}
+.growth{font-size:12px;margin-top:6px;}
+
+.action-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:14px 0;
+}
+
+.action-btn{
+  background:white;
+  border:none;
+  padding:14px;
+  border-radius:14px;
+  font-weight:600;
+  box-shadow:0 6px 15px rgba(0,0,0,0.1);
+}
+
+.card{
+  background:#FFF;
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:12px;
+  box-shadow:0 5px 12px rgba(0,0,0,0.08);
+}
+
+.card-title{font-weight:700;margin-bottom:6px;}
+.row{margin-top:6px;font-size:14px;}
+.warn{color:#d35400;}
+
+.chip{
+  display:inline-block;
+  background:#EEE;
+  padding:8px 12px;
+  border-radius:20px;
+  margin:4px;
+  font-size:13px;
+}
+
+.voice-btn{
+  position:fixed;
+  bottom:80px;
+  right:20px;
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  background:#FF6A00;
+  color:white;
+  border:none;
+  font-size:20px;
+  box-shadow:0 12px 25px rgba(0,0,0,0.25);
+}
+
+.navbar{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:white;
+  display:flex;
+  justify-content:space-around;
+  padding:10px 0;
+  box-shadow:0 -5px 10px rgba(0,0,0,0.1);
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<div class="hero-card">
+  <div class="hero-inner">
+    <div class="amount" id="profit">₹0</div>
+    <div class="title">Aaj ka Profit 🔥</div>
+    <div class="sub" id="subText">Sales ₹0 | Kharcha ₹0</div>
+    <div class="growth" id="growth"></div>
+  </div>
+</div>
+
+<!-- ACTIONS -->
+<div class="action-grid">
+  <button class="action-btn" onclick="quickAdd('sale')">🛒 + Sale</button>
+  <button class="action-btn" onclick="quickAdd('udhar')">💼 + Udhar</button>
+  <button class="action-btn" onclick="quickAdd('expense')">💸 + Kharcha</button>
+  <button class="action-btn" onclick="startVoice()">🎤 Bolke Likho</button>
+</div>
+
+<!-- INVENTORY -->
+<div class="card">
+  <div class="card-title">📦 Stock Alerts</div>
+  <div id="inventory"></div>
+</div>
+
+<!-- UDHAR -->
+<div class="card">
+  <div class="card-title">💰 Udhar</div>
+  <div id="udharList"></div>
+</div>
+
+<!-- AI -->
+<div class="card">
+  <div class="card-title">🧠 Smart Salah</div>
+  <div id="insights"></div>
+  <div id="actions"></div>
+</div>
+
+</div>
+
+<button class="voice-btn" onclick="startVoice()">🎤</button>
+
+<div class="navbar">
+  <div>🏠<br>Home</div>
+  <div>💼<br>Udhar</div>
+  <div>🧠<br>Salah</div>
+  <div>📊<br>Report</div>
+  <div>👤<br>Profile</div>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = { apiKey:"PASTE",authDomain:"PASTE",projectId:"PASTE" };
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let entries=[], inventory={}, customers={};
+let lastProduct="chai";
+
+async function load(){
+
+const snap=await getDocs(collection(db,"entries_v2"));
+entries=[]; snap.forEach(d=>entries.push(d.data()));
+
+// load inventory
+try{
+const invSnap=await getDocs(collection(db,"inventory"));
+invSnap.forEach(d=>inventory=d.data());
+}catch{}
+
+// load customers
+try{
+const custSnap=await getDocs(collection(db,"customers"));
+custSnap.forEach(d=>customers=d.data());
+}catch{}
+
+updateUI();
+loadAI();
+}
+
+function updateUI(){
+
+let sales=0, expense=0;
+
+entries.forEach(e=>{
+if(e.type==="sale") sales+=e.amount;
+if(e.type==="expense") expense+=e.amount;
+});
+
+const profit=sales-expense;
+
+document.getElementById("profit").innerText="₹"+profit;
+document.getElementById("subText").innerText=`Sales ₹${sales} | Kharcha ₹${expense}`;
+
+// INVENTORY
+let invHTML="";
+Object.keys(inventory).forEach(k=>{
+if(inventory[k]<5) invHTML+=`⚠️ ${k} (${inventory[k]})<br>`;
+});
+document.getElementById("inventory").innerHTML=invHTML;
+
+// UDHAR
+let uHTML="";
+Object.keys(customers).forEach(c=>{
+if(customers[c]>0) uHTML+=`⚠️ ${c} ₹${customers[c]}<br>`;
+});
+document.getElementById("udharList").innerHTML=uHTML;
+}
+
+// ADD ENTRY
+async function saveEntry(e){
+
+await addDoc(collection(db,"entries_v2"),{...e,createdAt:new Date()});
+
+// inventory update
+if(e.productName){
+inventory[e.productName]=Math.max((inventory[e.productName]||10)-(e.quantity||1),0);
+await setDoc(doc(db,"inventory","main"),inventory);
+}
+
+// udhar
+if(e.type==="udhar"){
+customers[e.customerName||"Customer"]=(customers[e.customerName]||0)+e.amount;
+await setDoc(doc(db,"customers","main"),customers);
+}
+
+load();
+}
+
+window.quickAdd=async function(type){
+let amt=prompt("Enter amount");
+if(!amt) return;
+saveEntry({type,amount:Number(amt)});
+}
+
+// AI
+async function loadAI(){
+
+let totalSales=0,totalProfit=0;
+entries.forEach(e=>{
+if(e.type==="sale"){totalSales+=e.amount;totalProfit+=e.amount;}
+if(e.type==="expense"){totalProfit-=e.amount;}
+});
+
+try{
+const res=await fetch("https://getaiinsight-wzwuduebea-uc.a.run.app",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({totalSales,totalProfit,billCount:entries.length,topItems:["chai"]})
+});
+
+const json=await res.json();
+
+document.getElementById("insights").innerHTML=`<div class="chip">${json.insight}</div>`;
+
+// ACTIONS
+let actions="";
+if(totalSales<200) actions+=`<div class="chip">Push sales</div>`;
+if(totalProfit<100) actions+=`<div class="chip">Reduce expense</div>`;
+document.getElementById("actions").innerHTML=actions;
+
+}catch{
+document.getElementById("insights").innerText="AI unavailable";
+}
+}
+
+// VOICE
+window.startVoice=function(){
+
+const r=new webkitSpeechRecognition();
+r.lang="hi-IN"; r.start();
+
+r.onresult=async(e)=>{
+const text=e.results[0][0].transcript;
+
+const res=await fetch("https://getaiinsight-wzwuduebea-uc.a.run.app",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({prompt:text})
+});
+
+const json=await res.json();
+let data={};
+
+try{data=JSON.parse(json.response);}
+catch{
+data={type:"sale",amount:50,productName:lastProduct,quantity:1};
+}
+
+saveEntry(data);
+};
+};
+
+load();
+
+</script>
+</body>
+</html>
